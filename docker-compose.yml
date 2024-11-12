@@ -1,0 +1,48 @@
+version: '3'
+services:
+  spark:
+    image: bitnami/spark:latest
+    environment:
+      - SPARK_MODE=client
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_JARS_IVY=/tmp/.ivy2
+    volumes:
+      - ./hive-site.xml:/opt/bitnami/spark/conf/hive-site.xml
+      - ivy_cache:/tmp/.ivy2  # Persistent volume for Ivy cache
+    command: ["spark-sql", "--conf", "spark.jars.ivy=/tmp/.ivy2"]
+    user: root  # Run as root to avoid permissions issues with Ivy
+
+  spark-master:
+    image: bitnami/spark:latest
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+    ports:
+      - "7077:7077"
+      - "8080:8080"
+
+  spark-worker:
+    image: bitnami/spark:latest
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+    depends_on:
+      - spark-master
+    ports:
+      - "8081:8081"
+
+  hive-metastore:
+    image: bde2020/hive-metastore-postgresql:latest
+    environment:
+      - HIVE_METASTORE_HOST=hive-metastore
+      - HIVE_SITE_CONF=/opt/hive/conf/hive-site.xml
+    volumes:
+      - ./hive-site.xml:/opt/bitnami/hive/conf/hive-site.xml
+    depends_on:
+      - spark-master
+
+volumes:
+  ivy_cache:
+    driver: local
+
